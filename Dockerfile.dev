@@ -1,0 +1,44 @@
+FROM public.ecr.aws/docker/library/ruby:3.2.2-slim as base
+
+WORKDIR /api
+ENV LANG=C.UTF-8 \
+  TZ=Asia/Tokyo
+
+
+#################
+# build
+#################
+FROM base as build
+
+RUN apt-get update -qq && \
+  apt-get install --no-install-recommends -y build-essential default-libmysqlclient-dev git libvips pkg-config && \
+  apt-get clean && \
+  rm -rf /var/cache/apt/archives/* && \
+  rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+COPY Gemfile Gemfile.lock /api/
+
+RUN gem update --system \
+  && gem install bundler
+RUN bundle install
+
+COPY . /api
+
+#################
+# development
+#################
+FROM base as development
+
+RUN apt-get update -qq && \
+  apt-get install --no-install-recommends -y build-essential default-libmysqlclient-dev git libvips pkg-config && \
+  apt-get clean && \
+  rm -rf /var/cache/apt/archives/* && \
+  rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+COPY Gemfile Gemfile.lock /api/
+
+COPY --from=build /usr/local/bundle /usr/local/bundle
+COPY --from=build /api /api
+
+EXPOSE 3000
+CMD ["rails", "server", "-b", "0.0.0.0"]
